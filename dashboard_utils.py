@@ -562,7 +562,7 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                         items = [f"{name}({int(top[name])}条)" for name in top.index[:3]]
                         summaries.append(f"**{dim_name}**: 非普遍性，集中在 {', '.join(items)}")
             if summaries:
-                st.caption("📊 规律总结（预警占该维度总条目≥70%判定为"普遍上涨"）：")
+                st.caption('📊 规律总结（预警占该维度总条目≥70%判定为"普遍上涨"）：')
                 for s in summaries:
                     st.caption(s)
         else:
