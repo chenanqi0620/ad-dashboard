@@ -541,6 +541,30 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
             display_alerts['CPC_change'] = display_alerts['CPC_change'].apply(lambda x: f"+{x:.1f}%")
             display_alerts.columns = [*dims, 'CPC (监测日)', 'CPC (前3日均值)', '涨幅']
             st.dataframe(display_alerts, use_container_width=True, hide_index=True)
+
+            # Pattern summary by dimension
+            total_rows = len(merged)
+            alert_count = len(alerts_df)
+            summaries = []
+            for dim_name in ['Country', 'Platform', 'Product']:
+                if dim_name not in alerts_df.columns:
+                    continue
+                dim_total = merged.groupby(dim_name).size()
+                dim_alert = alerts_df.groupby(dim_name).size()
+                dim_ratio = (dim_alert / dim_total).dropna().sort_values(ascending=False)
+                high_ratio = dim_ratio[dim_ratio >= 0.7]
+                if len(high_ratio) > 0:
+                    items = [f"{name}({int(dim_alert[name])}/{int(dim_total[name])})" for name in high_ratio.index]
+                    summaries.append(f"**{dim_name}**: {', '.join(items)} 普遍上涨")
+                else:
+                    top = dim_alert.sort_values(ascending=False)
+                    if len(top) > 0:
+                        items = [f"{name}({int(top[name])}条)" for name in top.index[:3]]
+                        summaries.append(f"**{dim_name}**: 非普遍性，集中在 {', '.join(items)}")
+            if summaries:
+                st.caption("📊 规律总结（预警占该维度总条目≥70%判定为"普遍上涨"）：")
+                for s in summaries:
+                    st.caption(s)
         else:
             st.success("✅ 无 CPC 上涨 20%+ 的预警")
     else:
