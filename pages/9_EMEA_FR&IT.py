@@ -298,7 +298,7 @@ else:
     st.info("无法加载 MP 计划数据")
 
 # --- CPC Monitoring ---
-st.header("🚨 CPC 变动预警 (Country → Product → Channel → Landing Page → Platform → Objective → Creative → Creative Sub)")
+st.header("🚨 CPC 上涨预警")
 st.caption("逻辑：监测日 CPC vs 前3日均值 CPC，上涨 20%+ 触发预警（周一监测上周五六日，其余监测前一天）")
 
 if len(monitor_data) > 0 and len(prev_dates) > 0:
@@ -355,7 +355,7 @@ else:
     st.info("数据不足，无法进行 CPC 监测")
 
 # --- VTR Monitoring ---
-st.header("🚨 VTR 变动预警 (Country → Product → Channel → Landing Page → Platform → Objective → Creative → Creative Sub)")
+st.header("🚨 VTR 下降预警")
 st.caption("逻辑：监测日 VTR vs 前3日均值 VTR，下降 25%+ 触发预警（周一监测上周五六日，其余监测前一天）")
 
 if len(monitor_data) > 0 and len(prev_dates) > 0:
