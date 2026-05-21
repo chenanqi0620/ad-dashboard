@@ -351,6 +351,7 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
     """
     st.title(f"📊 {page_name} Dashboard")
     st.caption("数据来源: Google Sheet (实时连接，每次刷新自动更新)")
+    st.markdown("""<style>[data-testid="stMetricValue"] { font-size: 1.2rem; }</style>""", unsafe_allow_html=True)
 
     df = load_raw_data(sheet_key)
 
