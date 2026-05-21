@@ -6,6 +6,7 @@ from dashboard_utils import (
 from google.oauth2.service_account import Credentials
 import gspread
 from datetime import datetime
+import time
 
 st.set_page_config(page_title="消耗异常总览", layout="wide")
 st.title("🚨 消耗异常总览 (全部子表)")
@@ -293,12 +294,27 @@ total_no_plan = 0
 total_deviation = 0
 all_results = []
 
-with st.spinner("正在加载所有子表数据..."):
-    # Pages 1-8
-    for config in PAGE_CONFIGS:
+def load_with_retry(func, *args, max_retries=3, **kwargs):
+    """Retry API calls with exponential backoff on 429 errors."""
+    for attempt in range(max_retries):
         try:
-            raw_df = load_raw_data(config['sheet_key'])
-            plan_df = load_spots_plan(config['sheet_key'], plan_tab=config['plan_tab'], plan_type=config['plan_type'])
+            return func(*args, **kwargs)
+        except Exception as e:
+            if '429' in str(e) and attempt < max_retries - 1:
+                time.sleep(10 * (attempt + 1))
+            else:
+                raise
+
+
+with st.spinner("正在加载所有子表数据（约30秒）..."):
+    # Pages 1-8
+    for i, config in enumerate(PAGE_CONFIGS):
+        try:
+            if i > 0:
+                time.sleep(5)
+            raw_df = load_with_retry(load_raw_data, config['sheet_key'])
+            time.sleep(3)
+            plan_df = load_with_retry(load_spots_plan, config['sheet_key'], plan_tab=config['plan_tab'], plan_type=config['plan_type'])
 
             if len(plan_df) == 0:
                 continue
@@ -330,8 +346,10 @@ with st.spinner("正在加载所有子表数据..."):
 
     # Page 9: EMEA FR&IT
     try:
-        emea_raw = load_raw_data('1Tpo3CHtniaKz050T_5mD3ewAGONVjfrDvqeSPt01gZI')
-        emea_plan = load_emea_mp_plans()
+        time.sleep(5)
+        emea_raw = load_with_retry(load_raw_data, '1Tpo3CHtniaKz050T_5mD3ewAGONVjfrDvqeSPt01gZI')
+        time.sleep(3)
+        emea_plan = load_with_retry(load_emea_mp_plans)
         if len(emea_plan) > 0:
             emea_plan = emea_plan[~emea_plan['Platform'].isin(EXCLUDE_PLATFORMS)]
             emea_plan['Country'] = emea_plan['Country'].replace({'N_ES': 'ES'})
