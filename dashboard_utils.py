@@ -4,6 +4,18 @@ import streamlit as st
 import plotly.express as px
 from google.oauth2.service_account import Credentials
 from datetime import datetime, timedelta, timezone
+import time
+
+
+def _retry_on_quota(func, *args, max_retries=3, **kwargs):
+    for attempt in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except gspread.exceptions.APIError as e:
+            if e.response.status_code == 429 and attempt < max_retries - 1:
+                time.sleep(15 * (attempt + 1))
+            else:
+                raise
 
 
 def get_monitor_dates():
@@ -30,11 +42,12 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 
+@st.cache_data(ttl=600)
 def load_raw_data(sheet_key, worksheet_name='raw data by ad'):
     gc = get_gspread_client()
-    spreadsheet = gc.open_by_key(sheet_key)
+    spreadsheet = _retry_on_quota(gc.open_by_key, sheet_key)
     ws = spreadsheet.worksheet(worksheet_name)
-    data = ws.get_all_values()
+    data = _retry_on_quota(ws.get_all_values)
     headers = data[0]
     df = pd.DataFrame(data[1:], columns=headers)
 
@@ -48,11 +61,12 @@ def load_raw_data(sheet_key, worksheet_name='raw data by ad'):
     return df
 
 
+@st.cache_data(ttl=600)
 def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
     gc = get_gspread_client()
-    spreadsheet = gc.open_by_key(sheet_key)
+    spreadsheet = _retry_on_quota(gc.open_by_key, sheet_key)
     ws = spreadsheet.worksheet(plan_tab)
-    data = ws.get_all_values()
+    data = _retry_on_quota(ws.get_all_values)
 
     if plan_type == 'standard':
         # Auto-detect: find the header row that contains 'Country' and 'Platform'
