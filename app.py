@@ -19,6 +19,8 @@ st.markdown("""
 | 6 | T80S&BCI | T80S & BCI Campaign |
 | 7 | B2B Reseller | B2B Reseller Campaign |
 | 8 | DE&NL Retailer | DE & NL Retailer Campaign |
+| 9 | EMEA FR&IT | EMEA FR & IT Campaign |
+| 10 | PD | PD Campaign |
 
 ---
 
