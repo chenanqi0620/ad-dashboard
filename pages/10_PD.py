@@ -11,7 +11,10 @@ render_dashboard(
     name_mappings={
         'Product': {
             'X12 OmniCyclone Care Complete': 'X12 OmniCyclone',
+            'T90 PRO OMNI Black': 'T90 PRO OMNI',
             'T90 PRO OMNI Black Care Kit': 'T90 PRO OMNI',
+            'A1600 LiDAR PRO': 'GOAT A1600 LiDAR PRO',
+            'A1600 LiDAR PRO Care Kit': 'GOAT A1600 LiDAR PRO',
             'P1': 'ULTRAMARINE P1',
         },
         'Country': {'N_ES': 'ES'},
