@@ -17,7 +17,9 @@ render_dashboard(
             'A1600 LiDAR PRO Care Kit': 'GOAT A1600 LiDAR PRO',
             'P1': 'ULTRAMARINE P1',
         },
+        'Platform': {'Google Search': 'Google SEM'},
         'Country': {'N_ES': 'ES'},
     },
-    exclude_platforms_plan=['PV', 'SEM']
+    exclude_platforms_plan=['PV'],
+    monitor_creative_sub_filter={'Google SEM': ['Product']},
 )

@@ -357,11 +357,14 @@ def generate_insights(df, metrics, daily):
 
 
 def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
-                     name_mappings=None, exclude_platforms_plan=None):
+                     name_mappings=None, exclude_platforms_plan=None,
+                     monitor_creative_sub_filter=None):
     """
     Main dashboard rendering function.
     name_mappings: dict with keys like 'Product', 'Creative Sub', 'Country' mapping plan values to raw data values
     exclude_platforms_plan: list of platform names to exclude from plan comparison
+    monitor_creative_sub_filter: dict {platform: [allowed creative subs]} - for the given platform,
+        only keep rows whose Creative Sub is in the list (applied to Plan vs Actual + CPC + VTR monitoring)
     """
     st.title(f"📊 {page_name} Dashboard")
     st.caption("数据来源: Google Sheet (实时连接，每次刷新自动更新)")
@@ -401,6 +404,16 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
     dims = ['Country', 'Product', 'Platform', 'Objective', 'Creative', 'Creative Sub']
     dims = [d for d in dims if d in filtered_df.columns]
 
+    def apply_cs_filter(d):
+        """For platforms in monitor_creative_sub_filter, keep only allowed Creative Subs."""
+        if not monitor_creative_sub_filter or 'Platform' not in d.columns or 'Creative Sub' not in d.columns:
+            return d
+        out = d
+        for plat, allowed in monitor_creative_sub_filter.items():
+            out = out[~((out['Platform'] == plat) & (~out['Creative Sub'].isin(allowed)))]
+        return out
+
+
     # --- Plan vs Actual ---
     if plan_tab:
         st.header("🎯 Plan vs 实际消耗监测")
@@ -420,6 +433,9 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                     if col in plan_df.columns:
                         plan_df[col] = plan_df[col].replace(mapping)
 
+            # Filter to allowed creative subs per platform (e.g. SEM only "Product")
+            plan_df = apply_cs_filter(plan_df)
+
             # Determine join keys based on available columns
             base_keys = ['Country', 'Product', 'Platform', 'AIP', 'Objective', 'Creative', 'Creative Sub']
             if 'Landing Page' in plan_df.columns and 'Landing Page' in filtered_df.columns:
@@ -432,6 +448,7 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                 for col, mapping in name_mappings.items():
                     if col in compare_df.columns:
                         compare_df[col] = compare_df[col].replace(mapping)
+            compare_df = apply_cs_filter(compare_df)
 
             monitor_date_strs = [d.strftime('%Y-%m-%d') for d in sorted(monitor_dates) if d in compare_df['Date'].values]
             if monitor_date_strs:
@@ -529,7 +546,8 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
         monitor_date_strs = [d.strftime('%Y-%m-%d') for d in sorted(monitor_dates) if d in filtered_df['Date'].values]
         st.caption(f"监测日期: {', '.join(monitor_date_strs)}")
 
-        cpc_df = filtered_df[filtered_df['Objective'].isin(['Traffic', 'Conversion'])]
+        cpc_df = apply_cs_filter(filtered_df)
+        cpc_df = cpc_df[cpc_df['Objective'].isin(['Traffic', 'Conversion'])]
 
         latest_group = cpc_df[cpc_df['Date'].isin(monitor_dates)].groupby(dims).agg(
             Cost=('Cost', 'sum'), Clicks=('Clicks', 'sum')
@@ -591,7 +609,8 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
 
     if len(monitor_data) > 0 and len(prev_dates) > 0:
         vtr_objectives = ['VVC Instream', 'VVC Instream TV', 'VVC Shorts', 'Videoview']
-        vtr_df = filtered_df[filtered_df['Objective'].isin(vtr_objectives)]
+        vtr_df = apply_cs_filter(filtered_df)
+        vtr_df = vtr_df[vtr_df['Objective'].isin(vtr_objectives)]
 
         latest_vtr = vtr_df[vtr_df['Date'].isin(monitor_dates)].groupby(dims).agg(
             Views=('Views', 'sum'), Impr=('Impr.', 'sum')

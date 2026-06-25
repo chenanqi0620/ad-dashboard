@@ -134,8 +134,10 @@ PAGE_CONFIGS = [
                 'A1600 LiDAR PRO Care Kit': 'GOAT A1600 LiDAR PRO',
                 'P1': 'ULTRAMARINE P1',
             },
+            'Platform': {'Google Search': 'Google SEM'},
             'Country': {'N_ES': 'ES'},
         },
+        'creative_sub_filter': {'Google SEM': ['Product']},
     },
 ]
 
@@ -346,6 +348,15 @@ with st.spinner("正在加载所有子表数据（约30秒）..."):
                         plan_df[col] = plan_df[col].replace(mapping)
                     if col in raw_df.columns:
                         raw_df[col] = raw_df[col].replace(mapping)
+
+            # Per-platform Creative Sub filter (e.g. SEM only "Product")
+            cs_filter = config.get('creative_sub_filter')
+            if cs_filter:
+                for plat, allowed in cs_filter.items():
+                    if 'Platform' in plan_df.columns and 'Creative Sub' in plan_df.columns:
+                        plan_df = plan_df[~((plan_df['Platform'] == plat) & (~plan_df['Creative Sub'].isin(allowed)))]
+                    if 'Platform' in raw_df.columns and 'Creative Sub' in raw_df.columns:
+                        raw_df = raw_df[~((raw_df['Platform'] == plat) & (~raw_df['Creative Sub'].isin(allowed)))]
 
             base_keys = ['Country', 'Product', 'Platform', 'AIP', 'Objective', 'Creative', 'Creative Sub']
             if 'Landing Page' in plan_df.columns and 'Landing Page' in raw_df.columns:
