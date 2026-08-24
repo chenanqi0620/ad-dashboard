@@ -139,6 +139,15 @@ PAGE_CONFIGS = [
         },
         'creative_sub_filter': {'Google SEM': ['Product']},
     },
+    {
+        'name': 'X12S&T90S',
+        'sheet_key': '1c0KEIGnN003GV2DKUCBD4s9Rc3z0mElPWdmRgsGU2ss',
+        'plan_tab': 'Spots Plan',
+        'plan_type': 'standard',
+        'name_mappings': {
+            'Country': {'N_ES': 'ES'},
+        },
+    },
 ]
 
 EXCLUDE_PLATFORMS = ['PV', 'SEM']

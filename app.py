@@ -21,6 +21,7 @@ st.markdown("""
 | 8 | DE&NL Retailer | DE & NL Retailer Campaign |
 | 9 | EMEA FR&IT | EMEA FR & IT Campaign |
 | 10 | PD | PD Campaign |
+| 11 | X12S&T90S | 2026 Sep Launch (X12S / T90S PRO / T90 MAX PRO) |
 
 ---
 
