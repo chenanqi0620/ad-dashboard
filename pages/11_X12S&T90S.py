@@ -9,7 +9,11 @@ render_dashboard(
     plan_tab='Spots Plan',
     plan_type='standard',
     name_mappings={
+        'Platform': {'Google Search': 'Google SEM'},
         'Country': {'N_ES': 'ES'},
     },
-    exclude_platforms_plan=['PV', 'SEM']
+    exclude_platforms_plan=['PV', 'SEM'],
+    # Google Search 只监测单品(Creative Sub=Product)，DB/WB Collection 的
+    # Generic&Competitor / Brand&Product 不做监测
+    monitor_creative_sub_filter={'Google SEM': ['Product']},
 )

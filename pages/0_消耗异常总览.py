@@ -145,8 +145,10 @@ PAGE_CONFIGS = [
         'plan_tab': 'Spots Plan',
         'plan_type': 'standard',
         'name_mappings': {
+            'Platform': {'Google Search': 'Google SEM'},
             'Country': {'N_ES': 'ES'},
         },
+        'creative_sub_filter': {'Google SEM': ['Product']},
     },
 ]
 
