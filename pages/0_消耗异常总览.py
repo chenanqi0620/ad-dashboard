@@ -144,9 +144,18 @@ PAGE_CONFIGS = [
         'sheet_key': '1c0KEIGnN003GV2DKUCBD4s9Rc3z0mElPWdmRgsGU2ss',
         'plan_tab': 'Spots Plan',
         'plan_type': 'standard',
+        # raw data 自己有两套叫法，是同一个产品，先统一
+        'raw_name_mappings': {
+            'Product': {'T90S PRO OMNI': 'T90S PRO'},
+        },
+        # MP 的 Landing Page 分类和 campaign 命名里带出来的对不上（MP 的 Listing 在 raw
+        # 里既是 Listing 又是 Banner Page），且它在 raw 里不区分任何行，不参与匹配
+        'exclude_join_keys': ['Landing Page'],
         'name_mappings': {
             'Platform': {'Google Search': 'Google SEM'},
             'Country': {'N_ES': 'ES'},
+            'Product': {'DB Collection': 'DEEBOT', 'WB Collection': 'WINBOT'},
+            'Objective': {'Video': 'Videoview'},
         },
         'creative_sub_filter': {'Google SEM': ['Product']},
     },
@@ -352,6 +361,11 @@ with st.spinner("正在加载所有子表数据（约30秒）..."):
             for p in EXCLUDE_PLATFORMS:
                 plan_df = plan_df[plan_df['Platform'] != p]
 
+            # Normalize raw data that labels the same thing two ways (raw side only)
+            for col, mapping in (config.get('raw_name_mappings') or {}).items():
+                if col in raw_df.columns:
+                    raw_df[col] = raw_df[col].replace(mapping)
+
             mappings = config.get('name_mappings', {})
             if mappings:
                 for col, mapping in mappings.items():
@@ -373,6 +387,9 @@ with st.spinner("正在加载所有子表数据（约30秒）..."):
             if 'Landing Page' in plan_df.columns and 'Landing Page' in raw_df.columns:
                 base_keys.insert(2, 'Landing Page')
             join_keys = [k for k in base_keys if k in plan_df.columns and k in raw_df.columns]
+            for k in (config.get('exclude_join_keys') or []):
+                if k in join_keys:
+                    join_keys.remove(k)
 
             result = run_plan_comparison(config['name'], raw_df, plan_df, join_keys, monitor_dates)
             if result:

@@ -358,19 +358,32 @@ def generate_insights(df, metrics, daily):
 
 def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                      name_mappings=None, exclude_platforms_plan=None,
-                     monitor_creative_sub_filter=None):
+                     monitor_creative_sub_filter=None, raw_name_mappings=None,
+                     exclude_join_keys=None):
     """
     Main dashboard rendering function.
     name_mappings: dict with keys like 'Product', 'Creative Sub', 'Country' mapping plan values to raw data values
+    raw_name_mappings: dict {column: {raw value -> canonical value}} applied to the raw data right after
+        loading, for fixing raw data that labels the same thing two ways (e.g. campaigns named
+        'T90S PRO' and 'T90S PRO OMNI' for one product). Unlike name_mappings it affects the whole
+        page - sidebar filters, charts, CPC/VTR monitoring - not just the Plan vs Actual join.
     exclude_platforms_plan: list of platform names to exclude from plan comparison
     monitor_creative_sub_filter: dict {platform: [allowed creative subs]} - for the given platform,
         only keep rows whose Creative Sub is in the list (applied to Plan vs Actual + CPC + VTR monitoring)
+    exclude_join_keys: list of columns to drop from the Plan vs Actual join key (e.g. 'Landing Page'
+        when plan and raw label landing pages differently and the column adds no granularity)
     """
     st.title(f"📊 {page_name} Dashboard")
     st.caption("数据来源: Google Sheet (实时连接，每次刷新自动更新)")
     st.markdown("""<style>[data-testid="stMetricValue"] { font-size: 1.2rem; }</style>""", unsafe_allow_html=True)
 
     df = load_raw_data(sheet_key)
+
+    # Normalize raw data that labels the same thing two ways, before anything reads it
+    if raw_name_mappings:
+        for col, mapping in raw_name_mappings.items():
+            if col in df.columns:
+                df[col] = df[col].replace(mapping)
 
     # --- Sidebar Filters ---
     st.sidebar.header("筛选条件")
@@ -441,6 +454,8 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
             if 'Landing Page' in plan_df.columns and 'Landing Page' in filtered_df.columns:
                 base_keys.insert(2, 'Landing Page')
             join_keys = [k for k in base_keys if k in plan_df.columns and k in filtered_df.columns]
+            if exclude_join_keys:
+                join_keys = [k for k in join_keys if k not in exclude_join_keys]
 
             # Normalize raw data mappings
             compare_df = filtered_df.copy()
