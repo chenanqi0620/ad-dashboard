@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from dashboard_utils import (
-    load_raw_data, load_spots_plan, get_gspread_client, get_monitor_dates
+    load_raw_data, load_spots_plan, get_gspread_client, get_monitor_dates, label_keys
 )
 from google.oauth2.service_account import Credentials
 import gspread
@@ -144,17 +144,22 @@ PAGE_CONFIGS = [
         'sheet_key': '1c0KEIGnN003GV2DKUCBD4s9Rc3z0mElPWdmRgsGU2ss',
         'plan_tab': 'Spots Plan',
         'plan_type': 'standard',
-        # raw data 自己有两套叫法，是同一个产品，先统一
+        # raw data 早期把 T90S PRO OMNI 的 Meta campaign 命名成 T90S PRO，统一成 MP 的叫法
         'raw_name_mappings': {
-            'Product': {'T90S PRO OMNI': 'T90S PRO'},
+            'Product': {'T90S PRO': 'T90S PRO OMNI'},
         },
-        # MP 的 Landing Page 分类和 campaign 命名里带出来的对不上（MP 的 Listing 在 raw
-        # 里既是 Listing 又是 Banner Page），且它在 raw 里不区分任何行，不参与匹配
-        'exclude_join_keys': ['Landing Page'],
+        # Landing Page / Benefit Channel(=raw 的 Channel) 两侧取值已对齐，都进匹配维度
+        'extra_join_keys': ['Channel'],
         'name_mappings': {
             'Platform': {'Google Search': 'Google SEM'},
             'Country': {'N_ES': 'ES'},
-            'Product': {'DB Collection': 'DEEBOT', 'WB Collection': 'WINBOT'},
+            'Product': {
+                'DB Collection': 'DEEBOT',
+                'WB Collection': 'WINBOT',
+                # MP 带套装/配色后缀，raw 只有主产品名
+                'T90 PRO OMNI Black': 'T90 PRO OMNI',
+                'X12 OmniCyclone Care Complete': 'X12 OmniCyclone',
+            },
             'Objective': {'Video': 'Videoview'},
         },
         'creative_sub_filter': {'Google SEM': ['Product']},
@@ -386,6 +391,9 @@ with st.spinner("正在加载所有子表数据（约30秒）..."):
             base_keys = ['Country', 'Product', 'Platform', 'AIP', 'Objective', 'Creative', 'Creative Sub']
             if 'Landing Page' in plan_df.columns and 'Landing Page' in raw_df.columns:
                 base_keys.insert(2, 'Landing Page')
+            for k in reversed(config.get('extra_join_keys') or []):
+                if k not in base_keys:
+                    base_keys.insert(2, k)
             join_keys = [k for k in base_keys if k in plan_df.columns and k in raw_df.columns]
             for k in (config.get('exclude_join_keys') or []):
                 if k in join_keys:
@@ -468,7 +476,7 @@ for page_name, result in all_results:
         d['Plan_Cost'] = d.apply(
             lambda r: f"${r['Plan_Cost']:,.2f} ⭐️" if r['_learning'] else f"${r['Plan_Cost']:,.2f}", axis=1)
         d = d.drop(columns=['_learning'])
-        d.columns = [*join_keys, 'Plan 预算']
+        d.columns = [*label_keys(join_keys), 'Plan 预算']
         st.dataframe(d, use_container_width=True, hide_index=True)
         if no_spend.apply(is_learning, axis=1).any():
             st.caption("⭐️ = Google DG Conversion 广告最近3天内新增，处于系统学习期（3~4天），消耗少属正常现象")
@@ -477,7 +485,7 @@ for page_name, result in all_results:
         st.error("⚠️ 无计划预算但有实际消耗（超范围投放）")
         d = no_plan[join_keys + ['Actual_Cost']].copy()
         d['Actual_Cost'] = d['Actual_Cost'].apply(lambda x: f"${x:,.2f}")
-        d.columns = [*join_keys, '实际消耗']
+        d.columns = [*label_keys(join_keys), '实际消耗']
         st.dataframe(d, use_container_width=True, hide_index=True)
 
     if len(deviation_alerts) > 0:
@@ -489,7 +497,7 @@ for page_name, result in all_results:
         d['Deviation'] = d.apply(
             lambda r: f"{float(r['Deviation']):+.1f}% ⭐️" if r['_learning'] else f"{float(r['Deviation']):+.1f}%", axis=1)
         d = d.drop(columns=['_learning'])
-        d.columns = [*join_keys, 'Plan 预算', '实际消耗', '偏差']
+        d.columns = [*label_keys(join_keys), 'Plan 预算', '实际消耗', '偏差']
         st.dataframe(d, use_container_width=True, hide_index=True)
         if deviation_alerts.apply(is_learning, axis=1).any():
             st.caption("⭐️ = Google DG Conversion 广告最近3天内新增，处于系统学习期（3~4天），消耗少属正常现象")

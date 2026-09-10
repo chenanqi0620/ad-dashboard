@@ -18,6 +18,15 @@ def _retry_on_quota(func, *args, max_retries=3, **kwargs):
                 raise
 
 
+# Join-key columns whose internal name (matching `raw data by ad`) differs from
+# the wording the MP uses, so tables read the way the planners do.
+KEY_LABELS = {'Channel': 'Benefit Channel'}
+
+
+def label_keys(keys):
+    return [KEY_LABELS.get(k, k) for k in keys]
+
+
 def get_monitor_dates():
     """Determine monitoring dates based on Beijing time weekday.
     Tue-Fri: monitor yesterday only; Monday: monitor Fri+Sat+Sun."""
@@ -87,6 +96,8 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
                 col_map['country'] = i
             elif h_clean == 'Product':
                 col_map['product'] = i
+            elif h_clean == 'Benefit Channel':
+                col_map['benefit_channel'] = i
             elif h_clean == 'Landing Page':
                 col_map['landing_page'] = i
             elif h_clean == 'Platform':
@@ -121,6 +132,7 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
         data_start = header_row_idx + 2  # skip header + day-of-week row
         country_idx = col_map.get('country', 0)
         product_idx = col_map.get('product', 2)
+        bc_idx = col_map.get('benefit_channel')
         lp_idx = col_map.get('landing_page')
         platform_idx = col_map.get('platform', 7)
         aip_idx = col_map.get('aip', 8)
@@ -128,6 +140,7 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
         creative_idx = col_map.get('creative', 10)
         sub_idx = col_map.get('creative_sub', 11)
         has_landing_page = lp_idx is not None
+        has_channel = bc_idx is not None
     elif plan_type == 'b2b':
         # B2B: dates start after col 14 (Remark), row 2 is header, data from row 4
         # Find where dates start
@@ -146,7 +159,9 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
         date_header_row = data[2]
         data_start = 4
         country_idx, product_idx, lp_idx, platform_idx, aip_idx, objective_idx, creative_idx, sub_idx = 0, 1, None, 4, 5, 6, 7, 8
+        bc_idx = None
         has_landing_page = False
+        has_channel = False
     elif plan_type == 'de_nl':
         # DE&NL: auto-detect like standard
         header_row_idx = None
@@ -165,6 +180,8 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
                 col_map['country'] = i
             elif h_clean == 'Product':
                 col_map['product'] = i
+            elif h_clean == 'Benefit Channel':
+                col_map['benefit_channel'] = i
             elif h_clean == 'Landing Page':
                 col_map['landing_page'] = i
             elif h_clean == 'Platform':
@@ -198,6 +215,7 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
         data_start = header_row_idx + 2
         country_idx = col_map.get('country', 0)
         product_idx = col_map.get('product', 2)
+        bc_idx = col_map.get('benefit_channel')
         lp_idx = col_map.get('landing_page')
         platform_idx = col_map.get('platform', 5)
         aip_idx = col_map.get('aip', 6)
@@ -205,6 +223,7 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
         creative_idx = col_map.get('creative', 8)
         sub_idx = col_map.get('creative_sub', 9)
         has_landing_page = lp_idx is not None
+        has_channel = bc_idx is not None
 
     # Parse date columns
     date_map = {}
@@ -266,6 +285,9 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
                 'Date': date_str,
                 'Plan_Cost': budget,
             }
+            if has_channel and bc_idx is not None:
+                # raw data by ad calls this column 'Channel'; keep the raw name so it joins
+                record['Channel'] = row[bc_idx].strip() if bc_idx < len(row) else ''
             if has_landing_page and lp_idx is not None:
                 record['Landing Page'] = row[lp_idx].strip() if lp_idx < len(row) else ''
             plan_records.append(record)
@@ -359,7 +381,7 @@ def generate_insights(df, metrics, daily):
 def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                      name_mappings=None, exclude_platforms_plan=None,
                      monitor_creative_sub_filter=None, raw_name_mappings=None,
-                     exclude_join_keys=None):
+                     exclude_join_keys=None, extra_join_keys=None):
     """
     Main dashboard rendering function.
     name_mappings: dict with keys like 'Product', 'Creative Sub', 'Country' mapping plan values to raw data values
@@ -372,6 +394,9 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
         only keep rows whose Creative Sub is in the list (applied to Plan vs Actual + CPC + VTR monitoring)
     exclude_join_keys: list of columns to drop from the Plan vs Actual join key (e.g. 'Landing Page'
         when plan and raw label landing pages differently and the column adds no granularity)
+    extra_join_keys: list of extra columns to add to the Plan vs Actual join key, e.g. 'Channel'
+        (the MP's 'Benefit Channel'). Only added when the column exists on both sides - verify the
+        values line up first, or you get paired 漏投/超范围投放 false alarms.
     """
     st.title(f"📊 {page_name} Dashboard")
     st.caption("数据来源: Google Sheet (实时连接，每次刷新自动更新)")
@@ -453,6 +478,9 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
             base_keys = ['Country', 'Product', 'Platform', 'AIP', 'Objective', 'Creative', 'Creative Sub']
             if 'Landing Page' in plan_df.columns and 'Landing Page' in filtered_df.columns:
                 base_keys.insert(2, 'Landing Page')
+            for k in reversed(extra_join_keys or []):
+                if k not in base_keys:
+                    base_keys.insert(2, k)
             join_keys = [k for k in base_keys if k in plan_df.columns and k in filtered_df.columns]
             if exclude_join_keys:
                 join_keys = [k for k in join_keys if k not in exclude_join_keys]
@@ -518,7 +546,7 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                     display_no_spend['Plan_Cost'] = display_no_spend.apply(
                         lambda r: f"${r['Plan_Cost']:,.2f} ⭐️" if r['_learning'] else f"${r['Plan_Cost']:,.2f}", axis=1)
                     display_no_spend = display_no_spend.drop(columns=['_learning'])
-                    display_no_spend.columns = [*join_keys, 'Plan 预算']
+                    display_no_spend.columns = [*label_keys(join_keys), 'Plan 预算']
                     st.dataframe(display_no_spend, use_container_width=True, hide_index=True)
                     has_learning_no_spend = no_spend.apply(is_learning, axis=1).any()
                     if has_learning_no_spend:
@@ -528,7 +556,7 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                     st.error("⚠️ 无计划预算但有实际消耗（超范围投放）")
                     display_no_plan = no_plan[join_keys + ['Actual_Cost']].copy()
                     display_no_plan['Actual_Cost'] = display_no_plan['Actual_Cost'].apply(lambda x: f"${x:,.2f}")
-                    display_no_plan.columns = [*join_keys, '实际消耗']
+                    display_no_plan.columns = [*label_keys(join_keys), '实际消耗']
                     st.dataframe(display_no_plan, use_container_width=True, hide_index=True)
 
                 if len(deviation_alerts) > 0:
@@ -540,7 +568,7 @@ def render_dashboard(page_name, sheet_key, plan_tab=None, plan_type='standard',
                     display_dev['Deviation'] = display_dev.apply(
                         lambda r: f"{float(r['Deviation']):+.1f}% ⭐️" if r['_learning'] else f"{float(r['Deviation']):+.1f}%", axis=1)
                     display_dev = display_dev.drop(columns=['_learning'])
-                    display_dev.columns = [*join_keys, 'Plan 预算', '实际消耗', '偏差']
+                    display_dev.columns = [*label_keys(join_keys), 'Plan 预算', '实际消耗', '偏差']
                     st.dataframe(display_dev, use_container_width=True, hide_index=True)
                     has_learning_dev = deviation_alerts.apply(is_learning, axis=1).any()
                     if has_learning_dev:
