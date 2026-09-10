@@ -22,6 +22,8 @@ st.markdown("""
 | 9 | EMEA FR&IT | EMEA FR & IT Campaign |
 | 10 | PD | PD Campaign |
 | 11 | X12S&T90S | 2026 Sep Launch (X12S / T90S PRO / T90 MAX PRO) |
+| 12 | WINBOT IFA | WINBOT IFA Activation Campaign (W2S PRO OMNI, DE/FR/IT/NL) |
+| 13 | DE Borussia | DE Borussia Düsseldorf Campaign (品牌联名) |
 
 ---
 

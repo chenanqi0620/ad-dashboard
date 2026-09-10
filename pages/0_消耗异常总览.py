@@ -164,6 +164,43 @@ PAGE_CONFIGS = [
         },
         'creative_sub_filter': {'Google SEM': ['Product']},
     },
+    {
+        'name': 'WINBOT IFA',
+        'sheet_key': '13Z_PM_l7pZSIIh19sjX_mIk21Aha1eU-wgYG4C_yY9I',
+        'plan_tab': 'Spots Plan',
+        'plan_type': 'standard',
+        # Landing Page / Benefit Channel(=raw 的 Channel) 两侧映射后已对齐，都进匹配维度
+        'extra_join_keys': ['Channel'],
+        'name_mappings': {
+            # MP 用活动名占位，raw 里是具体机型（整个 MP 只有这一个产品）
+            'Product': {'WINBOT Activation': 'W2S PRO OMNI'},
+            # MP 写渠道全称/全大写，raw 用缩写
+            'Channel': {'OTTO': 'Otto', 'Boulanger': 'BLG'},
+            'Landing Page': {'Product page': 'Product Page'},
+        },
+    },
+    {
+        'name': 'DE Borussia',
+        'sheet_key': '1wgm1P-N4ZHp94m_sncl_XqRf3SQDc-zKQoJzmM-bCe4',
+        'plan_tab': 'Spots Plan',
+        'plan_type': 'standard',
+        # Meta 这条广告命名漏了 "1/2/3 ... (Reel)" 后缀且带前导空格，TT 用的是全名，统一成 MP 的叫法
+        'raw_name_mappings': {
+            'Creative Sub': {' Interview with Timo': 'Interview 1/2/3 with Timo (Reel)'},
+        },
+        # Landing Page(Brand Store) / Benefit Channel(=raw 的 Channel) 两侧已对齐，都进匹配维度
+        'extra_join_keys': ['Channel'],
+        'name_mappings': {
+            'Channel': {'otto': 'Otto'},
+            # MP 用 Awareness/Engagement，raw 落到投放层的 Reach/Videoview
+            'Objective': {'Awareness': 'Reach', 'Engagement': 'Videoview'},
+            # MP 带时长/人名后缀，raw 只有主名（都是一对一）
+            'Creative Sub': {
+                'Highlight Video 90s': 'Highlight Video',
+                'Player Posts carrousel Timo & FZD': 'Player Posts carrousel',
+            },
+        },
+    },
 ]
 
 EXCLUDE_PLATFORMS = ['PV', 'SEM']
