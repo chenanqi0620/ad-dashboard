@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 from dashboard_utils import (
-    load_raw_data, load_spots_plan, get_gspread_client, get_monitor_dates, label_keys
+    load_raw_data, load_spots_plan, get_gspread_client, get_monitor_dates, label_keys,
+    read_tabs_batch, _retry_on_quota
 )
 from google.oauth2.service_account import Credentials
 import gspread
@@ -208,17 +209,17 @@ EXCLUDE_PLATFORMS = ['PV', 'SEM']
 
 @st.cache_data(ttl=600)
 def load_emea_mp_plans():
-    scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    creds_dict = st.secrets["gcp_service_account"]
-    creds = Credentials.from_service_account_info(dict(creds_dict), scopes=scopes)
-    gc = gspread.authorize(creds)
-    spreadsheet = gc.open_by_key('1Tpo3CHtniaKz050T_5mD3ewAGONVjfrDvqeSPt01gZI')
+    gc = get_gspread_client()
+    spreadsheet = _retry_on_quota(gc.open_by_key, '1Tpo3CHtniaKz050T_5mD3ewAGONVjfrDvqeSPt01gZI')
 
-    mp_tabs = [ws.title for ws in spreadsheet.worksheets() if ws.title.startswith('MP-')]
+    mp_tabs = [ws.title for ws in _retry_on_quota(spreadsheet.worksheets)
+               if ws.title.startswith('MP-')]
+    # 一次请求读完所有 MP- tab，否则这一块单独就要 20 次请求，顶穿读配额
+    tab_values = read_tabs_batch(spreadsheet, mp_tabs)
+
     all_records = []
     for tab_name in mp_tabs:
-        ws = spreadsheet.worksheet(tab_name)
-        data = ws.get_all_values()
+        data = tab_values.get(tab_name, [])
         header_row_idx = None
         for r_idx in range(min(5, len(data))):
             row_text = [cell.strip() for cell in data[r_idx]]

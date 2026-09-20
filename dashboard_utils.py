@@ -3,8 +3,14 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 from google.oauth2.service_account import Credentials
+from gspread.utils import absolute_range_name, fill_gaps
 from datetime import datetime, timedelta, timezone
 import time
+
+
+# 429 = 读配额超了(60次/分钟/service account)，500/503 = Google 后端偶发抖动。
+# 两种都是等一下就好，不该让整页崩掉。
+_RETRIABLE_STATUS = (429, 500, 503)
 
 
 def _retry_on_quota(func, *args, max_retries=3, **kwargs):
@@ -12,10 +18,34 @@ def _retry_on_quota(func, *args, max_retries=3, **kwargs):
         try:
             return func(*args, **kwargs)
         except gspread.exceptions.APIError as e:
-            if e.response.status_code == 429 and attempt < max_retries - 1:
+            if e.response.status_code in _RETRIABLE_STATUS and attempt < max_retries - 1:
                 time.sleep(15 * (attempt + 1))
             else:
                 raise
+
+
+def read_tab(spreadsheet, tab_name):
+    """读一个 tab 的全部单元格，只花 1 次 API 请求。
+
+    别用 `spreadsheet.worksheet(名字).get_all_values()`：gspread 为了把 tab 名解析成
+    sheetId 会把整表 metadata 再拉一遍，等于 2 次请求。总览页要读十几个 MP，多出来的
+    这一半请求足够把 Sheets 的读配额(60次/分钟/用户)顶穿，然后整页 429。
+    """
+    resp = _retry_on_quota(spreadsheet.values_get, absolute_range_name(tab_name))
+    return fill_gaps(resp.get('values', []))
+
+
+def read_tabs_batch(spreadsheet, tab_names):
+    """一次请求读多个 tab，返回 {tab 名: 二维数组}。"""
+    if not tab_names:
+        return {}
+    resp = _retry_on_quota(
+        spreadsheet.values_batch_get, [absolute_range_name(t) for t in tab_names]
+    )
+    return {
+        name: fill_gaps(vr.get('values', []))
+        for name, vr in zip(tab_names, resp.get('valueRanges', []))
+    }
 
 
 # Join-key columns whose internal name (matching `raw data by ad`) differs from
@@ -55,8 +85,7 @@ def get_gspread_client():
 def load_raw_data(sheet_key, worksheet_name='raw data by ad'):
     gc = get_gspread_client()
     spreadsheet = _retry_on_quota(gc.open_by_key, sheet_key)
-    ws = spreadsheet.worksheet(worksheet_name)
-    data = _retry_on_quota(ws.get_all_values)
+    data = read_tab(spreadsheet, worksheet_name)
     headers = data[0]
     df = pd.DataFrame(data[1:], columns=headers)
 
@@ -74,8 +103,7 @@ def load_raw_data(sheet_key, worksheet_name='raw data by ad'):
 def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
     gc = get_gspread_client()
     spreadsheet = _retry_on_quota(gc.open_by_key, sheet_key)
-    ws = spreadsheet.worksheet(plan_tab)
-    data = _retry_on_quota(ws.get_all_values)
+    data = read_tab(spreadsheet, plan_tab)
 
     if plan_type == 'standard':
         # Auto-detect: find the header row that contains 'Country' and 'Platform'
