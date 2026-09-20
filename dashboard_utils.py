@@ -81,6 +81,32 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 
+# 匹配用的维度列有时会被粘进肉眼看不见的字符（X12S&T90S 表 2026-09-18/19 的 Objective
+# 就被粘成 'VVC S\x08horts'，夹了个 0x08 退格符），MP 侧是干净的 'VVC Shorts'，
+# join 就当成两个值 → 同一条 MP 同时报"漏投 + 超范围投放"。统一在 load 时洗掉。
+_DIM_COLS = ['Country', 'Product', 'Platform', 'AIP', 'Objective', 'Creative',
+             'Creative Sub', 'Channel', 'Landing Page', 'Ad Group', 'Category']
+# 0x00-0x1f + 0x7f 全删（\t \n 也在内，维度值里出现它们一样是脏数据）
+_CTRL_TRANS = dict.fromkeys(list(range(0x20)) + [0x7f], None)
+
+
+def clean_dim_columns(df):
+    """去掉维度列里的控制符/不可见空格，并去首尾空格。
+
+    注意不要用 `df[col].dtype == object` 做前置判断：pandas 3 的字符串列 dtype 是
+    `str` 而不是 `object`，那么写会整段静默跳过、看起来"改了但没效果"。
+    """
+    for col in _DIM_COLS:
+        if col in df.columns:
+            df[col] = (df[col].astype('object').astype(str)
+                       .str.translate(_CTRL_TRANS)
+                       .str.replace('\u00a0', ' ', regex=False)   # NBSP
+                       .str.replace('\u200b', '', regex=False)    # 零宽空格
+                       .str.replace('\ufeff', '', regex=False)    # BOM
+                       .str.strip())
+    return df
+
+
 @st.cache_data(ttl=600)
 def load_raw_data(sheet_key, worksheet_name='raw data by ad'):
     gc = get_gspread_client()
@@ -96,6 +122,7 @@ def load_raw_data(sheet_key, worksheet_name='raw data by ad'):
 
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df = df.dropna(subset=['Date'])
+    df = clean_dim_columns(df)
     return df
 
 
@@ -323,6 +350,7 @@ def load_spots_plan(sheet_key, plan_tab='Spots Plan', plan_type='standard'):
     plan_df = pd.DataFrame(plan_records)
     if len(plan_df) > 0:
         plan_df['Date'] = pd.to_datetime(plan_df['Date'], errors='coerce')
+        plan_df = clean_dim_columns(plan_df)
     return plan_df
 
 
