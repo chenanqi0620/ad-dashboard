@@ -6,7 +6,8 @@ from google.oauth2.service_account import Credentials
 from dashboard_utils import (
     render_dashboard, load_raw_data, get_gspread_client,
     calculate_metrics, calculate_daily_metrics, generate_insights,
-    get_monitor_dates, read_tabs_batch, _retry_on_quota
+    get_monitor_dates, read_tabs_batch, _retry_on_quota,
+    EMEA_MP_TAB_PREFIXES, EMEA_PLAN_MAPPINGS, EMEA_RAW_MAPPINGS, apply_mappings
 )
 import plotly.express as px
 from datetime import datetime
@@ -22,7 +23,7 @@ def load_all_mp_plans():
     spreadsheet = _retry_on_quota(gc.open_by_key, SHEET_KEY)
 
     mp_tabs = [ws.title for ws in _retry_on_quota(spreadsheet.worksheets)
-               if ws.title.startswith('MP-')]
+               if ws.title.startswith(EMEA_MP_TAB_PREFIXES)]
 
     # 9 个 MP- tab 一次请求读完。逐个 worksheet().get_all_values() 是 18 次请求，
     # 加上别的页面共用同一个 service account 的配额，很容易 429 整页崩
@@ -53,7 +54,9 @@ def load_all_mp_plans():
                 col_map['country'] = i
             elif h_clean == 'Product':
                 col_map['product'] = i
-            elif h_clean == 'Benefit Channel':
+            elif h_clean in ('Benefit Channel', 'Channel'):
+                # 老 tab 写 'Benefit Channel'，'MP Sep'/'MP-IT BTS' 写 'Channel'，
+                # 只认前者会让这些 tab 的 Channel 全成空值，join 全军覆没
                 col_map['benefit_channel'] = i
             elif h_clean == 'Landing Page':
                 col_map['landing_page'] = i
@@ -198,25 +201,14 @@ if len(plan_df) > 0:
     # Exclude PV and SEM
     plan_df = plan_df[~plan_df['Platform'].isin(['PV', 'SEM'])]
 
-    # Name mappings
-    plan_df['Country'] = plan_df['Country'].replace({'N_ES': 'ES'})
-    plan_df['Product'] = plan_df['Product'].replace({
-        'T90 PRO OMNI Black': 'T90 PRO OMNI',
-        'X12 PRO OMNI Black': 'X12 PRO',
-        'T50 OMNI Gen3 Black': 'T50 OMNI Gen3',
-    })
-    plan_df['Creative Sub'] = plan_df['Creative Sub'].replace({
-        'KV&ZAHA': 'KV',
-        'Pieter - T90 Carousel Post': 'Pieter',
-        'T90 designers ambassadors - Pieter': 'Pieter',
-    })
+    plan_df = apply_mappings(plan_df, EMEA_PLAN_MAPPINGS)
 
     # Determine join keys
     join_keys = ['Country', 'Product', 'Channel', 'Landing Page', 'Platform', 'AIP', 'Objective', 'Creative', 'Creative Sub']
     join_keys = [k for k in join_keys if k in plan_df.columns and k in filtered_df.columns]
 
     compare_df = filtered_df.copy()
-    compare_df['Creative Sub'] = compare_df['Creative Sub'].replace({'KV&ZAHA': 'KV'})
+    compare_df = apply_mappings(compare_df, EMEA_RAW_MAPPINGS)
 
     monitor_date_strs = [d.strftime('%Y-%m-%d') for d in sorted(monitor_dates) if d in compare_df['Date'].values]
     if monitor_date_strs:

@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 from dashboard_utils import (
     load_raw_data, load_spots_plan, get_gspread_client, get_monitor_dates, label_keys,
-    read_tabs_batch, _retry_on_quota
+    read_tabs_batch, _retry_on_quota,
+    EMEA_MP_TAB_PREFIXES, EMEA_PLAN_MAPPINGS, EMEA_RAW_MAPPINGS, apply_mappings
 )
 from google.oauth2.service_account import Credentials
 import gspread
@@ -213,7 +214,7 @@ def load_emea_mp_plans():
     spreadsheet = _retry_on_quota(gc.open_by_key, '1Tpo3CHtniaKz050T_5mD3ewAGONVjfrDvqeSPt01gZI')
 
     mp_tabs = [ws.title for ws in _retry_on_quota(spreadsheet.worksheets)
-               if ws.title.startswith('MP-')]
+               if ws.title.startswith(EMEA_MP_TAB_PREFIXES)]
     # 一次请求读完所有 MP- tab，否则这一块单独就要 20 次请求，顶穿读配额
     tab_values = read_tabs_batch(spreadsheet, mp_tabs)
 
@@ -236,7 +237,9 @@ def load_emea_mp_plans():
                 col_map['country'] = i
             elif h_clean == 'Product':
                 col_map['product'] = i
-            elif h_clean == 'Benefit Channel':
+            elif h_clean in ('Benefit Channel', 'Channel'):
+                # 老 tab 写 'Benefit Channel'，'MP Sep'/'MP-IT BTS' 写 'Channel'，
+                # 只认前者会让这些 tab 的 Channel 全成空值，join 全军覆没
                 col_map['benefit_channel'] = i
             elif h_clean == 'Landing Page':
                 col_map['landing_page'] = i
@@ -454,19 +457,9 @@ with st.spinner("正在加载所有子表数据（约30秒）..."):
         emea_plan = load_with_retry(load_emea_mp_plans)
         if len(emea_plan) > 0:
             emea_plan = emea_plan[~emea_plan['Platform'].isin(EXCLUDE_PLATFORMS)]
-            emea_plan['Country'] = emea_plan['Country'].replace({'N_ES': 'ES'})
-            emea_plan['Product'] = emea_plan['Product'].replace({
-                'T90 PRO OMNI Black': 'T90 PRO OMNI',
-                'X12 PRO OMNI Black': 'X12 PRO',
-                'T50 OMNI Gen3 Black': 'T50 OMNI Gen3',
-            })
-            emea_plan['Creative Sub'] = emea_plan['Creative Sub'].replace({
-                'KV&ZAHA': 'KV',
-                'Pieter - T90 Carousel Post': 'Pieter',
-                'T90 designers ambassadors - Pieter': 'Pieter',
-            })
+            emea_plan = apply_mappings(emea_plan, EMEA_PLAN_MAPPINGS)
             emea_raw_copy = emea_raw.copy()
-            emea_raw_copy['Creative Sub'] = emea_raw_copy['Creative Sub'].replace({'KV&ZAHA': 'KV'})
+            emea_raw_copy = apply_mappings(emea_raw_copy, EMEA_RAW_MAPPINGS)
 
             join_keys_emea = ['Country', 'Product', 'Channel', 'Landing Page', 'Platform', 'AIP', 'Objective', 'Creative', 'Creative Sub']
             join_keys_emea = [k for k in join_keys_emea if k in emea_plan.columns and k in emea_raw_copy.columns]

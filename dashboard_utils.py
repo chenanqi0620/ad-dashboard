@@ -48,6 +48,56 @@ def read_tabs_batch(spreadsheet, tab_names):
     }
 
 
+# ---- EMEA FR&IT 表（多个 MP tab 合成一份 plan）的命名映射 ----
+# pages/9_EMEA_FR&IT.py 和 pages/0_消耗异常总览.py 共用，别各写一份
+
+# tab 名的 MP 前缀：老 tab 叫 'MP-Jan'，2026-09 新建的叫 'MP Sep'（空格不是连字符），
+# 只认 'MP-' 会把整个 9 月的计划漏掉，全部消耗都误报成"超范围投放"
+EMEA_MP_TAB_PREFIXES = ('MP-', 'MP ')
+
+# plan 值 -> raw 值
+EMEA_PLAN_MAPPINGS = {
+    'Country': {'N_ES': 'ES'},
+    'Product': {
+        'T90 PRO OMNI Black': 'T90 PRO OMNI',
+        'X12 PRO OMNI Black': 'X12 PRO',
+        'T50 OMNI Gen3 Black': 'T50 OMNI Gen3',
+    },
+    # MP 写渠道全称，raw 用缩写
+    'Channel': {'Boulanger': 'BLG'},
+    # MP 少写了 "Page"
+    'Landing Page': {'Product': 'Product Page'},
+    # MP 漏了 Google 前缀
+    'Platform': {'GDN': 'Google GDN'},
+    # 'MP Sep' 用连字符，raw 和其他 tab 用空格
+    'Objective': {'VVC-Instream': 'VVC Instream', 'VVC-Shorts': 'VVC Shorts'},
+    'Creative Sub': {
+        'KV&ZAHA': 'KV',
+        'Pieter - T90 Carousel Post': 'Pieter',
+        'T90 designers ambassadors - Pieter': 'Pieter',
+        # MP-ES 用下划线，raw 用空格
+        '3 stage videos_H': '3 stage videos H',
+        '3 stage videos_V': '3 stage videos V',
+        '3 stage videos_H&V': '3 stage videos H&V',
+    },
+}
+
+# raw 值 -> plan 值（只在对比时用，不动侧边栏/图表）
+# MP 只写 'PLF' 一行预算，raw 拆成横版/竖版两条，要合起来才跟计划同口径。
+# 实测 PLF H 只出现在 VVC Instream、PLF V 只在 VVC Shorts，Objective 已经把横竖版分开了，
+# 所以合并不会把两条不同的计划行并成一条。
+EMEA_RAW_MAPPINGS = {
+    'Creative Sub': {'KV&ZAHA': 'KV', 'PLF H': 'PLF', 'PLF V': 'PLF'},
+}
+
+
+def apply_mappings(df, mappings):
+    for col, mapping in (mappings or {}).items():
+        if col in df.columns:
+            df[col] = df[col].replace(mapping)
+    return df
+
+
 # Join-key columns whose internal name (matching `raw data by ad`) differs from
 # the wording the MP uses, so tables read the way the planners do.
 KEY_LABELS = {'Channel': 'Benefit Channel'}
