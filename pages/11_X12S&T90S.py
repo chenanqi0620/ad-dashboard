@@ -24,6 +24,8 @@ render_dashboard(
             # Care Complete 只在 DE，纯 X12 OmniCyclone 只在 IT）
             'T90 PRO OMNI Black': 'T90 PRO OMNI',
             'X12 OmniCyclone Care Complete': 'X12 OmniCyclone',
+            # MP 的 X12S 套装后缀，raw 只有 X12S OmniCyclone，是同一个东西
+            'X12S OmniCyclone Care Kit': 'X12S OmniCyclone',
         },
         # MP 里 IT 的 videoview 行写成 Video，DE/FR 写成 Videoview，raw 只有 Videoview
         'Objective': {'Video': 'Videoview'},

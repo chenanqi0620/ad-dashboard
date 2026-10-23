@@ -161,6 +161,7 @@ PAGE_CONFIGS = [
                 # MP 带套装/配色后缀，raw 只有主产品名
                 'T90 PRO OMNI Black': 'T90 PRO OMNI',
                 'X12 OmniCyclone Care Complete': 'X12 OmniCyclone',
+                'X12S OmniCyclone Care Kit': 'X12S OmniCyclone',
             },
             'Objective': {'Video': 'Videoview'},
         },
