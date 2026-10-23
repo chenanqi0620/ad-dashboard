@@ -153,7 +153,7 @@ PAGE_CONFIGS = [
         # Landing Page / Benefit Channel(=raw 的 Channel) 两侧取值已对齐，都进匹配维度
         'extra_join_keys': ['Channel'],
         'name_mappings': {
-            'Platform': {'Google Search': 'Google SEM'},
+            'Platform': {'Google Search': 'Google SEM', 'OpenAI': 'OPEN AI'},
             'Country': {'N_ES': 'ES'},
             'Product': {
                 'DB Collection': 'DEEBOT',

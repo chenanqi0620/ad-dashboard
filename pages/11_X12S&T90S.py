@@ -14,7 +14,7 @@ render_dashboard(
         'Product': {'T90S PRO': 'T90S PRO OMNI'},
     },
     name_mappings={
-        'Platform': {'Google Search': 'Google SEM'},
+        'Platform': {'Google Search': 'Google SEM', 'OpenAI': 'OPEN AI'},
         'Country': {'N_ES': 'ES'},
         'Product': {
             # MP 的 SEM 大盘词包 = raw 里的品牌名
