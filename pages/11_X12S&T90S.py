@@ -34,7 +34,8 @@ render_dashboard(
     # Benefit Channel(=raw 的 Channel) 也对齐（AMZ / Official website），都进匹配维度
     extra_join_keys=['Channel'],
     exclude_platforms_plan=['PV', 'SEM'],
-    # Google Search 只监测单品(Creative Sub=Product)，DB/WB Collection 的
-    # Generic&Competitor / Brand&Product 不做监测
-    monitor_creative_sub_filter={'Google SEM': ['Product']},
+    # Google Search 监测单品(Product)和单品竞品词(Product Competitor)——两侧叫法一致，直接对得上。
+    # 大盘词包仍不监测：Generic / Competitor(raw 把 plan 的 Generic&Competitor 拆成两行，对不上)、
+    # Brand&Product(用户未要求)。要加这几个得先用 raw_name_mappings 合并 Generic+Competitor。
+    monitor_creative_sub_filter={'Google SEM': ['Product', 'Product Competitor']},
 )

@@ -165,7 +165,7 @@ PAGE_CONFIGS = [
             },
             'Objective': {'Video': 'Videoview'},
         },
-        'creative_sub_filter': {'Google SEM': ['Product']},
+        'creative_sub_filter': {'Google SEM': ['Product', 'Product Competitor']},
     },
     {
         'name': 'WINBOT IFA',
